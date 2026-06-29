@@ -22,6 +22,9 @@
     The script outputs one ZIP file only:
         DCS_ENQ_StartDate_to_EndDate_HOSTNAME_TIMESTAMP.zip
 
+    If BkRoot is configured in config.ps1, the final ZIP file is copied there
+    after successful creation.
+
     The script is designed to run daily.
     If StartDate or EndDate in config.ps1 is empty, the script skips processing.
 
@@ -44,6 +47,9 @@
     2026-06-12
 
 .CHANGELOG
+    1.0.1 - 2026-06-29
+        - Added BkRoot config support to back up the final ZIP file.
+
     1.0.0 - 2026-06-12
         - Initial release.
         - Added config.ps1 based execution.
@@ -115,6 +121,10 @@ if (-not (Get-Variable -Name OutputRoot -Scope Script -ErrorAction SilentlyConti
 
 if (-not (Get-Variable -Name ScriptLogRoot -Scope Script -ErrorAction SilentlyContinue)) {
     $ScriptLogRoot = ""
+}
+
+if (-not (Get-Variable -Name BkRoot -Scope Script -ErrorAction SilentlyContinue)) {
+    $BkRoot = ""
 }
 
 # ============================================================
@@ -243,6 +253,7 @@ Write-Log "INFO" "Online log root: $OnlineLogRoot"
 Write-Log "INFO" "Archived log root: $ArchivedLogRoot"
 Write-Log "INFO" "Output root: $OutputRoot"
 Write-Log "INFO" "Script log root: $ScriptLogRoot"
+Write-Log "INFO" "Backup root: $BkRoot"
 Write-Log "INFO" "Configured StartDate: $StartDate"
 Write-Log "INFO" "Configured EndDate: $EndDate"
 Write-Log -Message ""
@@ -539,6 +550,41 @@ try {
 catch {
     Write-Log "ERROR" "Failed to create final ZIP file. Error: $($_.Exception.Message)"
     throw
+}
+
+# ============================================================
+# Backup Final ZIP
+# ============================================================
+
+if (-not [string]::IsNullOrWhiteSpace($BkRoot)) {
+    $BkZipFilePath = Join-Path $BkRoot $ZipFileName
+
+    try {
+        if (-not (Test-Path -LiteralPath $BkRoot)) {
+            New-Item -Path $BkRoot -ItemType Directory -Force | Out-Null
+            Write-Log "INFO" "Backup folder created: $BkRoot"
+        }
+
+        if (Test-Path -LiteralPath $BkZipFilePath) {
+            Remove-Item -LiteralPath $BkZipFilePath -Force
+        }
+
+        Copy-Item -LiteralPath $ZipFilePath -Destination $BkZipFilePath -Force
+
+        if (-not (Test-Path -LiteralPath $BkZipFilePath)) {
+            throw "Backup ZIP file was not created: $BkZipFilePath"
+        }
+
+        Write-Log "INFO" "Final ZIP file backed up successfully: $BkZipFilePath"
+    }
+    catch {
+        Write-Log "ERROR" "Failed to back up final ZIP file. Error: $($_.Exception.Message)"
+        Write-Log "ERROR" "Config file date range will not be cleared."
+        throw
+    }
+}
+else {
+    Write-Log "INFO" "Backup root is empty. Skipping ZIP backup."
 }
 
 # ============================================================

@@ -34,6 +34,8 @@ $EndDate = ""
 
     If ScriptLogRoot is empty, the script writes execution logs to:
         OutputRoot\log
+
+    If BkRoot is empty, the script skips backing up the final ZIP file.
 #>
 
 # ============================================================
@@ -75,3 +77,6 @@ $OutputRoot = "O:\Batch\dcs_enq_log_extracter"
 # If empty, defaults to:
 #     OutputRoot\log
 $ScriptLogRoot = "O:\Batch\dcs_enq_log_extracter"
+
+# If empty, the script skips backing up the final ZIP file.
+$BkRoot = "O:\Batch\dcs_enq_log_extracter\bk"
