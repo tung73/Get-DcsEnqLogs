@@ -33,7 +33,7 @@ $EndDate = ""
     If HostName is empty, the script uses the local computer name.
 
     If ScriptLogRoot is empty, the script writes execution logs to:
-        OutputRoot\log
+        WorkRoot\log
 
     If BkRoot is empty, the script skips backing up the final ZIP file.
 #>
@@ -72,11 +72,15 @@ $ArchivedLogRoot = "O:\ArchivedLog"
 # Output Paths
 # ============================================================
 
+# Final destination for the generated ZIP file.
 $OutputRoot = "O:\Batch\dcs_enq_log_extracter"
 
+# Temporary working directory for collected logs during processing.
+$WorkRoot = "O:\Batch\dcs_enq_log_extracter\work"
+
 # If empty, defaults to:
-#     OutputRoot\log
-$ScriptLogRoot = "O:\Batch\dcs_enq_log_extracter"
+#     WorkRoot\log
+$ScriptLogRoot = "O:\Batch\dcs_enq_log_extracter\log"
 
 # If empty, the script skips backing up the final ZIP file.
 $BkRoot = "O:\Batch\dcs_enq_log_extracter\bk"
