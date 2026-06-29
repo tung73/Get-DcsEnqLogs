@@ -19,6 +19,10 @@
     the timestamp format:
         yyyy-MM-dd HH:mm:ss
 
+    Lines where the username column contains "uat" (case-insensitive) are removed.
+    The username is the fourth bracket-enclosed field after the timestamp, for example:
+        2026-06-04 15:39:56,061 [9] [10.12.187.33] [token] [cpuat37] ...
+
     The script outputs one ZIP file to DestinationZipPath:
         DCS_ENQ_StartDate_to_EndDate_HOSTNAME_TIMESTAMP.zip
 
@@ -40,7 +44,7 @@
     Get-DcsEnqLogs.ps1
 
 .VERSION
-    1.1.0
+    1.1.1
 
 .AUTHOR
     ITU2
@@ -52,6 +56,9 @@
     2026-06-29
 
 .CHANGELOG
+    1.1.1 - 2026-06-29
+        - Clean-LogFile now removes lines where the username column contains uat.
+
     1.1.0 - 2026-06-29
         - Renamed config variables to follow consistent naming conventions.
         - Renamed Clear-ConfigDateRange to Reset-ConfigDateRange.
@@ -240,10 +247,24 @@ function Clean-LogFile {
     )
 
     $timestampPattern = '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
+    $usernameColumnPattern = '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[^[]*\[[^\]]*\]\s*\[[^\]]*\]\s*\[[^\]]*\]\s*\[([^\]]*)\]'
+    $uatUsernamePattern = 'uat'
     $tempFile = "$Path.tmp"
 
     Get-Content -LiteralPath $Path | Where-Object {
-        $_ -match $timestampPattern
+        if ($_ -notmatch $timestampPattern) {
+            return $false
+        }
+
+        if ($_ -match $usernameColumnPattern) {
+            $username = $Matches[1]
+
+            if ($username -match $uatUsernamePattern) {
+                return $false
+            }
+        }
+
+        return $true
     } | Set-Content -LiteralPath $tempFile -Encoding UTF8
 
     Move-Item -LiteralPath $tempFile -Destination $Path -Force
