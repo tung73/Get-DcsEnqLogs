@@ -19,8 +19,11 @@
     the timestamp format:
         yyyy-MM-dd HH:mm:ss
 
-    The script outputs one ZIP file only:
+    The script outputs one ZIP file to OutputRoot:
         DCS_ENQ_StartDate_to_EndDate_HOSTNAME_TIMESTAMP.zip
+
+    Temporary working files are created under WorkRoot and removed after
+    the final ZIP is created.
 
     If BkRoot is configured in config.ps1, the final ZIP file is copied there
     after successful creation.
@@ -44,9 +47,13 @@
     2026-06-12
 
 .LAST UPDATED
-    2026-06-12
+    2026-06-29
 
 .CHANGELOG
+    1.0.2 - 2026-06-29
+        - Added WorkRoot config for temporary working files.
+        - OutputRoot is now used only for the final ZIP destination.
+
     1.0.1 - 2026-06-29
         - Added BkRoot config support to back up the final ZIP file.
 
@@ -119,6 +126,10 @@ if (-not (Get-Variable -Name OutputRoot -Scope Script -ErrorAction SilentlyConti
     $OutputRoot = "O:\Batch\dcs_enq_log_extracter"
 }
 
+if (-not (Get-Variable -Name WorkRoot -Scope Script -ErrorAction SilentlyContinue)) {
+    $WorkRoot = "O:\Batch\dcs_enq_log_extracter\work"
+}
+
 if (-not (Get-Variable -Name ScriptLogRoot -Scope Script -ErrorAction SilentlyContinue)) {
     $ScriptLogRoot = ""
 }
@@ -144,7 +155,7 @@ $InvalidFileNameCharsPattern = '[\\/:*?"<>|]'
 $SafeHostName = $EffectiveHostName -replace $InvalidFileNameCharsPattern, "_"
 
 if ([string]::IsNullOrWhiteSpace($ScriptLogRoot)) {
-    $ScriptLogRoot = Join-Path $OutputRoot "log"
+    $ScriptLogRoot = Join-Path $WorkRoot "log"
 }
 
 # ============================================================
@@ -156,12 +167,16 @@ try {
         New-Item -Path $OutputRoot -ItemType Directory -Force | Out-Null
     }
 
+    if (-not (Test-Path -LiteralPath $WorkRoot)) {
+        New-Item -Path $WorkRoot -ItemType Directory -Force | Out-Null
+    }
+
     if (-not (Test-Path -LiteralPath $ScriptLogRoot)) {
         New-Item -Path $ScriptLogRoot -ItemType Directory -Force | Out-Null
     }
 }
 catch {
-    throw "Failed to create output or log folder. Error: $($_.Exception.Message)"
+    throw "Failed to create output, work, or log folder. Error: $($_.Exception.Message)"
 }
 
 $ScriptLogFile = Join-Path $ScriptLogRoot ("Get-DcsEnqLogs_{0}_{1}.log" -f $SafeHostName, $RunTimestamp)
@@ -252,6 +267,7 @@ Write-Log "INFO" "PowerShell version: $($PSVersionTable.PSVersion)"
 Write-Log "INFO" "Online log root: $OnlineLogRoot"
 Write-Log "INFO" "Archived log root: $ArchivedLogRoot"
 Write-Log "INFO" "Output root: $OutputRoot"
+Write-Log "INFO" "Work root: $WorkRoot"
 Write-Log "INFO" "Script log root: $ScriptLogRoot"
 Write-Log "INFO" "Backup root: $BkRoot"
 Write-Log "INFO" "Configured StartDate: $StartDate"
@@ -307,7 +323,7 @@ Write-Log -Message ""
 # ============================================================
 
 $WorkFolderName = "DCS_ENQ_{0}_to_{1}_{2}_{3}_work" -f $StartDateText, $EndDateText, $SafeHostName, $RunTimestamp
-$WorkFolder = Join-Path $OutputRoot $WorkFolderName
+$WorkFolder = Join-Path $WorkRoot $WorkFolderName
 
 try {
     if (Test-Path -LiteralPath $WorkFolder) {
