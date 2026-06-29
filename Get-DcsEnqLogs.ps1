@@ -3,14 +3,14 @@
     Collects DCS ENQ logs for a configured date range and outputs one ZIP file.
 
 .DESCRIPTION
-    This script collects DCS_ENQ_yyyyMMdd.log files based on StartDate and EndDate
-    configured in config.ps1.
+    This script collects DCS_ENQ_yyyyMMdd.log files based on ExtractionStartDate and
+    ExtractionEndDate configured in config.ps1.
 
     Current month and previous month logs are read from:
-        OnlineLogRoot\yyyyMMdd\DCS_ENQ_yyyyMMdd.log
+        SourceOnlineLogPath\yyyyMMdd\DCS_ENQ_yyyyMMdd.log
 
     Older logs are read from archived monthly ZIP files matching:
-        ArchivedLogRoot\Log*OnlineyyyyMM.zip
+        SourceArchiveLogPath\Log*OnlineyyyyMM.zip
 
     Inside each archive ZIP, the script looks for:
         yyyyMMdd\DCS_ENQ_yyyyMMdd.log
@@ -19,26 +19,28 @@
     the timestamp format:
         yyyy-MM-dd HH:mm:ss
 
-    The script outputs one ZIP file to OutputRoot:
+    The script outputs one ZIP file to DestinationZipPath:
         DCS_ENQ_StartDate_to_EndDate_HOSTNAME_TIMESTAMP.zip
 
-    Temporary working files are created under WorkRoot and removed after
+    Temporary working files are created under ProcessingWorkPath and removed after
     the final ZIP is created.
 
-    If BkRoot is configured in config.ps1, the final ZIP file is copied there
+    If BackupPath is configured in config.ps1, the final ZIP file is copied there
     after successful creation.
 
     The script is designed to run daily.
-    If StartDate or EndDate in config.ps1 is empty, the script skips processing.
+    If ExtractionStartDate or ExtractionEndDate in config.ps1 is empty, the script
+    skips processing.
 
     If the final ZIP file is generated successfully and the temporary folder is
-    cleaned up successfully, StartDate and EndDate in config.ps1 are cleared.
+    cleaned up successfully, ExtractionStartDate and ExtractionEndDate in config.ps1
+    are cleared.
 
 .SCRIPT NAME
     Get-DcsEnqLogs.ps1
 
 .VERSION
-    1.0.0
+    1.1.0
 
 .AUTHOR
     ITU2
@@ -50,6 +52,10 @@
     2026-06-29
 
 .CHANGELOG
+    1.1.0 - 2026-06-29
+        - Renamed config variables to follow consistent naming conventions.
+        - Renamed Clear-ConfigDateRange to Reset-ConfigDateRange.
+
     1.0.2 - 2026-06-29
         - Added WorkRoot config for temporary working files.
         - OutputRoot is now used only for the final ZIP destination.
@@ -102,40 +108,40 @@ catch {
 # Default Config Safety
 # ============================================================
 
-if (-not (Get-Variable -Name StartDate -Scope Script -ErrorAction SilentlyContinue)) {
-    $StartDate = ""
+if (-not (Get-Variable -Name ExtractionStartDate -Scope Script -ErrorAction SilentlyContinue)) {
+    $ExtractionStartDate = ""
 }
 
-if (-not (Get-Variable -Name EndDate -Scope Script -ErrorAction SilentlyContinue)) {
-    $EndDate = ""
+if (-not (Get-Variable -Name ExtractionEndDate -Scope Script -ErrorAction SilentlyContinue)) {
+    $ExtractionEndDate = ""
 }
 
-if (-not (Get-Variable -Name HostName -Scope Script -ErrorAction SilentlyContinue)) {
-    $HostName = ""
+if (-not (Get-Variable -Name TargetHostName -Scope Script -ErrorAction SilentlyContinue)) {
+    $TargetHostName = ""
 }
 
-if (-not (Get-Variable -Name OnlineLogRoot -Scope Script -ErrorAction SilentlyContinue)) {
-    $OnlineLogRoot = "O:\Log\Online"
+if (-not (Get-Variable -Name SourceOnlineLogPath -Scope Script -ErrorAction SilentlyContinue)) {
+    $SourceOnlineLogPath = "O:\Log\Online"
 }
 
-if (-not (Get-Variable -Name ArchivedLogRoot -Scope Script -ErrorAction SilentlyContinue)) {
-    $ArchivedLogRoot = "O:\ArchivedLog"
+if (-not (Get-Variable -Name SourceArchiveLogPath -Scope Script -ErrorAction SilentlyContinue)) {
+    $SourceArchiveLogPath = "O:\ArchivedLog"
 }
 
-if (-not (Get-Variable -Name OutputRoot -Scope Script -ErrorAction SilentlyContinue)) {
-    $OutputRoot = "O:\Batch\dcs_enq_log_extracter"
+if (-not (Get-Variable -Name DestinationZipPath -Scope Script -ErrorAction SilentlyContinue)) {
+    $DestinationZipPath = "O:\Batch\dcs_enq_log_extracter"
 }
 
-if (-not (Get-Variable -Name WorkRoot -Scope Script -ErrorAction SilentlyContinue)) {
-    $WorkRoot = "O:\Batch\dcs_enq_log_extracter\work"
+if (-not (Get-Variable -Name ProcessingWorkPath -Scope Script -ErrorAction SilentlyContinue)) {
+    $ProcessingWorkPath = "O:\Batch\dcs_enq_log_extracter\work"
 }
 
-if (-not (Get-Variable -Name ScriptLogRoot -Scope Script -ErrorAction SilentlyContinue)) {
-    $ScriptLogRoot = ""
+if (-not (Get-Variable -Name LogPath -Scope Script -ErrorAction SilentlyContinue)) {
+    $LogPath = ""
 }
 
-if (-not (Get-Variable -Name BkRoot -Scope Script -ErrorAction SilentlyContinue)) {
-    $BkRoot = ""
+if (-not (Get-Variable -Name BackupPath -Scope Script -ErrorAction SilentlyContinue)) {
+    $BackupPath = ""
 }
 
 # ============================================================
@@ -144,18 +150,18 @@ if (-not (Get-Variable -Name BkRoot -Scope Script -ErrorAction SilentlyContinue)
 
 $RunTimestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 
-if ([string]::IsNullOrWhiteSpace($HostName)) {
-    $EffectiveHostName = $env:COMPUTERNAME
+if ([string]::IsNullOrWhiteSpace($TargetHostName)) {
+    $ResolvedHostName = $env:COMPUTERNAME
 }
 else {
-    $EffectiveHostName = $HostName
+    $ResolvedHostName = $TargetHostName
 }
 
 $InvalidFileNameCharsPattern = '[\\/:*?"<>|]'
-$SafeHostName = $EffectiveHostName -replace $InvalidFileNameCharsPattern, "_"
+$SafeHostName = $ResolvedHostName -replace $InvalidFileNameCharsPattern, "_"
 
-if ([string]::IsNullOrWhiteSpace($ScriptLogRoot)) {
-    $ScriptLogRoot = Join-Path $WorkRoot "log"
+if ([string]::IsNullOrWhiteSpace($LogPath)) {
+    $LogPath = Join-Path $ProcessingWorkPath "log"
 }
 
 # ============================================================
@@ -163,23 +169,23 @@ if ([string]::IsNullOrWhiteSpace($ScriptLogRoot)) {
 # ============================================================
 
 try {
-    if (-not (Test-Path -LiteralPath $OutputRoot)) {
-        New-Item -Path $OutputRoot -ItemType Directory -Force | Out-Null
+    if (-not (Test-Path -LiteralPath $DestinationZipPath)) {
+        New-Item -Path $DestinationZipPath -ItemType Directory -Force | Out-Null
     }
 
-    if (-not (Test-Path -LiteralPath $WorkRoot)) {
-        New-Item -Path $WorkRoot -ItemType Directory -Force | Out-Null
+    if (-not (Test-Path -LiteralPath $ProcessingWorkPath)) {
+        New-Item -Path $ProcessingWorkPath -ItemType Directory -Force | Out-Null
     }
 
-    if (-not (Test-Path -LiteralPath $ScriptLogRoot)) {
-        New-Item -Path $ScriptLogRoot -ItemType Directory -Force | Out-Null
+    if (-not (Test-Path -LiteralPath $LogPath)) {
+        New-Item -Path $LogPath -ItemType Directory -Force | Out-Null
     }
 }
 catch {
-    throw "Failed to create output, work, or log folder. Error: $($_.Exception.Message)"
+    throw "Failed to create destination, work, or log folder. Error: $($_.Exception.Message)"
 }
 
-$ScriptLogFile = Join-Path $ScriptLogRoot ("Get-DcsEnqLogs_{0}_{1}.log" -f $SafeHostName, $RunTimestamp)
+$ScriptLogFilePath = Join-Path $LogPath ("Get-DcsEnqLogs_{0}_{1}.log" -f $SafeHostName, $RunTimestamp)
 
 function Write-Log {
     param(
@@ -200,11 +206,11 @@ function Write-Log {
         $line = "{0} [{1}] {2}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Level, $Message
     }
 
-    Add-Content -Path $ScriptLogFile -Value $line -Encoding UTF8
+    Add-Content -Path $ScriptLogFilePath -Value $line -Encoding UTF8
     Write-Host $line
 }
 
-function Clear-ConfigDateRange {
+function Reset-ConfigDateRange {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path
@@ -214,14 +220,14 @@ function Clear-ConfigDateRange {
 
     $content = [regex]::Replace(
         $content,
-        '(?m)^\s*\$StartDate\s*=.*$',
-        '$StartDate = ""'
+        '(?m)^\s*\$ExtractionStartDate\s*=.*$',
+        '$ExtractionStartDate = ""'
     )
 
     $content = [regex]::Replace(
         $content,
-        '(?m)^\s*\$EndDate\s*=.*$',
-        '$EndDate = ""'
+        '(?m)^\s*\$ExtractionEndDate\s*=.*$',
+        '$ExtractionEndDate = ""'
     )
 
     Set-Content -LiteralPath $Path -Value $content -Encoding UTF8
@@ -261,25 +267,25 @@ Write-Log "INFO" "Script path: $($MyInvocation.MyCommand.Path)"
 Write-Log "INFO" "Config path: $ConfigPath"
 Write-Log "INFO" "User name: $env:USERNAME"
 Write-Log "INFO" "Computer name: $env:COMPUTERNAME"
-Write-Log "INFO" "Configured host name: $HostName"
-Write-Log "INFO" "Effective host name: $EffectiveHostName"
+Write-Log "INFO" "Target host name: $TargetHostName"
+Write-Log "INFO" "Resolved host name: $ResolvedHostName"
 Write-Log "INFO" "PowerShell version: $($PSVersionTable.PSVersion)"
-Write-Log "INFO" "Online log root: $OnlineLogRoot"
-Write-Log "INFO" "Archived log root: $ArchivedLogRoot"
-Write-Log "INFO" "Output root: $OutputRoot"
-Write-Log "INFO" "Work root: $WorkRoot"
-Write-Log "INFO" "Script log root: $ScriptLogRoot"
-Write-Log "INFO" "Backup root: $BkRoot"
-Write-Log "INFO" "Configured StartDate: $StartDate"
-Write-Log "INFO" "Configured EndDate: $EndDate"
+Write-Log "INFO" "Source online log path: $SourceOnlineLogPath"
+Write-Log "INFO" "Source archive log path: $SourceArchiveLogPath"
+Write-Log "INFO" "Destination ZIP path: $DestinationZipPath"
+Write-Log "INFO" "Processing work path: $ProcessingWorkPath"
+Write-Log "INFO" "Log path: $LogPath"
+Write-Log "INFO" "Backup path: $BackupPath"
+Write-Log "INFO" "Configured extraction start date: $ExtractionStartDate"
+Write-Log "INFO" "Configured extraction end date: $ExtractionEndDate"
 Write-Log -Message ""
 
 # ============================================================
 # Skip If Date Range Empty
 # ============================================================
 
-if ([string]::IsNullOrWhiteSpace([string]$StartDate) -or [string]::IsNullOrWhiteSpace([string]$EndDate)) {
-    Write-Log "WARN" "StartDate or EndDate is empty. Skipping processing."
+if ([string]::IsNullOrWhiteSpace([string]$ExtractionStartDate) -or [string]::IsNullOrWhiteSpace([string]$ExtractionEndDate)) {
+    Write-Log "WARN" "ExtractionStartDate or ExtractionEndDate is empty. Skipping processing."
     Write-Log "INFO" "Config file date range was not changed."
     Write-Log "INFO" "Script completed."
     exit 0
@@ -290,28 +296,28 @@ if ([string]::IsNullOrWhiteSpace([string]$StartDate) -or [string]::IsNullOrWhite
 # ============================================================
 
 try {
-    $ParsedStartDate = [datetime]::Parse($StartDate).Date
+    $ParsedStartDate = [datetime]::Parse($ExtractionStartDate).Date
 }
 catch {
-    Write-Log "ERROR" "Invalid StartDate value: $StartDate"
+    Write-Log "ERROR" "Invalid ExtractionStartDate value: $ExtractionStartDate"
     throw
 }
 
 try {
-    $ParsedEndDate = [datetime]::Parse($EndDate).Date
+    $ParsedEndDate = [datetime]::Parse($ExtractionEndDate).Date
 }
 catch {
-    Write-Log "ERROR" "Invalid EndDate value: $EndDate"
+    Write-Log "ERROR" "Invalid ExtractionEndDate value: $ExtractionEndDate"
     throw
 }
 
 if ($ParsedStartDate -gt $ParsedEndDate) {
-    Write-Log "ERROR" "StartDate is later than EndDate. StartDate=$($ParsedStartDate.ToString('yyyy-MM-dd')), EndDate=$($ParsedEndDate.ToString('yyyy-MM-dd'))"
-    throw "Invalid date range. StartDate cannot be later than EndDate."
+    Write-Log "ERROR" "ExtractionStartDate is later than ExtractionEndDate. StartDate=$($ParsedStartDate.ToString('yyyy-MM-dd')), EndDate=$($ParsedEndDate.ToString('yyyy-MM-dd'))"
+    throw "Invalid date range. ExtractionStartDate cannot be later than ExtractionEndDate."
 }
 
-$StartDateText = $ParsedStartDate.ToString("yyyyMMdd")
-$EndDateText = $ParsedEndDate.ToString("yyyyMMdd")
+$StartDateCompact = $ParsedStartDate.ToString("yyyyMMdd")
+$EndDateCompact = $ParsedEndDate.ToString("yyyyMMdd")
 
 Write-Log "INFO" "Date range is valid."
 Write-Log "INFO" "Start date: $($ParsedStartDate.ToString('yyyy-MM-dd'))"
@@ -322,19 +328,19 @@ Write-Log -Message ""
 # Prepare Temporary Folder
 # ============================================================
 
-$WorkFolderName = "DCS_ENQ_{0}_to_{1}_{2}_{3}_work" -f $StartDateText, $EndDateText, $SafeHostName, $RunTimestamp
-$WorkFolder = Join-Path $WorkRoot $WorkFolderName
+$WorkingSessionName = "DCS_ENQ_{0}_to_{1}_{2}_{3}_work" -f $StartDateCompact, $EndDateCompact, $SafeHostName, $RunTimestamp
+$WorkingSessionPath = Join-Path $ProcessingWorkPath $WorkingSessionName
 
 try {
-    if (Test-Path -LiteralPath $WorkFolder) {
-        Remove-Item -LiteralPath $WorkFolder -Recurse -Force
+    if (Test-Path -LiteralPath $WorkingSessionPath) {
+        Remove-Item -LiteralPath $WorkingSessionPath -Recurse -Force
     }
 
-    New-Item -Path $WorkFolder -ItemType Directory -Force | Out-Null
-    Write-Log "INFO" "Temporary working folder created: $WorkFolder"
+    New-Item -Path $WorkingSessionPath -ItemType Directory -Force | Out-Null
+    Write-Log "INFO" "Temporary working folder created: $WorkingSessionPath"
 }
 catch {
-    Write-Log "ERROR" "Failed to prepare temporary working folder: $WorkFolder. Error: $($_.Exception.Message)"
+    Write-Log "ERROR" "Failed to prepare temporary working folder: $WorkingSessionPath. Error: $($_.Exception.Message)"
     throw
 }
 
@@ -367,7 +373,7 @@ Write-Log -Message ""
 # Process Dates
 # ============================================================
 
-$CollectedCount = 0
+$CollectedLogCount = 0
 $CurrentDate = $ParsedStartDate
 
 while ($CurrentDate -le $ParsedEndDate) {
@@ -379,14 +385,14 @@ while ($CurrentDate -le $ParsedEndDate) {
 
     Write-Log "INFO" "Processing date: $($CurrentDate.ToString('yyyy-MM-dd'))"
 
-    $DestinationFolder = Join-Path $WorkFolder (Join-Path $MonthText $DateText)
+    $DestinationFolder = Join-Path $WorkingSessionPath (Join-Path $MonthText $DateText)
     $DestinationFile = Join-Path $DestinationFolder $LogFileName
 
     $FoundForDate = $false
 
     if ($DateMonthStart -ge $PreviousMonthStart) {
         # Online source
-        $OnlineDateFolder = Join-Path $OnlineLogRoot $DateText
+        $OnlineDateFolder = Join-Path $SourceOnlineLogPath $DateText
         $OnlineFile = Join-Path $OnlineDateFolder $LogFileName
 
         Write-Log "INFO" "Selected source: online"
@@ -399,7 +405,7 @@ while ($CurrentDate -le $ParsedEndDate) {
 
                 Clean-LogFile -Path $DestinationFile
 
-                $CollectedCount++
+                $CollectedLogCount++
                 $FoundForDate = $true
 
                 Write-Log "INFO" "Copied and cleaned online log: $DestinationFile"
@@ -424,10 +430,10 @@ while ($CurrentDate -le $ParsedEndDate) {
     else {
     # Archive source
     $ArchivePattern = "Log*Online{0}.zip" -f $MonthText
-    $ArchiveFiles = @(Get-ChildItem -Path $ArchivedLogRoot -Filter $ArchivePattern -File -ErrorAction SilentlyContinue)
+    $ArchiveFiles = @(Get-ChildItem -Path $SourceArchiveLogPath -Filter $ArchivePattern -File -ErrorAction SilentlyContinue)
 
     Write-Log "INFO" "Selected source: archive"
-    Write-Log "INFO" "Archive search pattern: $(Join-Path $ArchivedLogRoot $ArchivePattern)"
+    Write-Log "INFO" "Archive search pattern: $(Join-Path $SourceArchiveLogPath $ArchivePattern)"
 
     if ($ArchiveFiles.Count -eq 0) {
         Write-Log "WARN" "No archive ZIP files found for month $MonthText using pattern $ArchivePattern"
@@ -467,7 +473,7 @@ while ($CurrentDate -le $ParsedEndDate) {
 
                     Clean-LogFile -Path $DestinationFile
 
-                    $CollectedCount++
+                    $CollectedLogCount++
                     $FoundForDate = $true
 
                     Write-Log "INFO" "Extracted and cleaned archived log: $DestinationFile"
@@ -517,23 +523,23 @@ while ($CurrentDate -le $ParsedEndDate) {
 }
 
 Write-Log "INFO" "Date processing completed."
-Write-Log "INFO" "Collected log count: $CollectedCount"
+Write-Log "INFO" "Collected log count: $CollectedLogCount"
 Write-Log -Message ""
 
 # ============================================================
 # No Logs Found
 # ============================================================
 
-if ($CollectedCount -eq 0) {
+if ($CollectedLogCount -eq 0) {
     Write-Log "WARN" "No logs were collected. Final ZIP will not be created."
 
-    if (Test-Path -LiteralPath $WorkFolder) {
+    if (Test-Path -LiteralPath $WorkingSessionPath) {
         try {
-            Remove-Item -LiteralPath $WorkFolder -Recurse -Force
-            Write-Log "INFO" "Temporary working folder removed: $WorkFolder"
+            Remove-Item -LiteralPath $WorkingSessionPath -Recurse -Force
+            Write-Log "INFO" "Temporary working folder removed: $WorkingSessionPath"
         }
         catch {
-            Write-Log "ERROR" "Failed to remove temporary working folder: $WorkFolder. Error: $($_.Exception.Message)"
+            Write-Log "ERROR" "Failed to remove temporary working folder: $WorkingSessionPath. Error: $($_.Exception.Message)"
             throw
         }
     }
@@ -547,15 +553,15 @@ if ($CollectedCount -eq 0) {
 # Create Final ZIP
 # ============================================================
 
-$ZipFileName = "DCS_ENQ_{0}_to_{1}_{2}_{3}.zip" -f $StartDateText, $EndDateText, $SafeHostName, $RunTimestamp
-$ZipFilePath = Join-Path $OutputRoot $ZipFileName
+$ZipFileName = "DCS_ENQ_{0}_to_{1}_{2}_{3}.zip" -f $StartDateCompact, $EndDateCompact, $SafeHostName, $RunTimestamp
+$ZipFilePath = Join-Path $DestinationZipPath $ZipFileName
 
 try {
     if (Test-Path -LiteralPath $ZipFilePath) {
         Remove-Item -LiteralPath $ZipFilePath -Force
     }
 
-    Compress-Archive -Path (Join-Path $WorkFolder "*") -DestinationPath $ZipFilePath -Force
+    Compress-Archive -Path (Join-Path $WorkingSessionPath "*") -DestinationPath $ZipFilePath -Force
 
     if (-not (Test-Path -LiteralPath $ZipFilePath)) {
         throw "ZIP file was not created: $ZipFilePath"
@@ -572,26 +578,26 @@ catch {
 # Backup Final ZIP
 # ============================================================
 
-if (-not [string]::IsNullOrWhiteSpace($BkRoot)) {
-    $BkZipFilePath = Join-Path $BkRoot $ZipFileName
+if (-not [string]::IsNullOrWhiteSpace($BackupPath)) {
+    $BackupZipFilePath = Join-Path $BackupPath $ZipFileName
 
     try {
-        if (-not (Test-Path -LiteralPath $BkRoot)) {
-            New-Item -Path $BkRoot -ItemType Directory -Force | Out-Null
-            Write-Log "INFO" "Backup folder created: $BkRoot"
+        if (-not (Test-Path -LiteralPath $BackupPath)) {
+            New-Item -Path $BackupPath -ItemType Directory -Force | Out-Null
+            Write-Log "INFO" "Backup folder created: $BackupPath"
         }
 
-        if (Test-Path -LiteralPath $BkZipFilePath) {
-            Remove-Item -LiteralPath $BkZipFilePath -Force
+        if (Test-Path -LiteralPath $BackupZipFilePath) {
+            Remove-Item -LiteralPath $BackupZipFilePath -Force
         }
 
-        Copy-Item -LiteralPath $ZipFilePath -Destination $BkZipFilePath -Force
+        Copy-Item -LiteralPath $ZipFilePath -Destination $BackupZipFilePath -Force
 
-        if (-not (Test-Path -LiteralPath $BkZipFilePath)) {
-            throw "Backup ZIP file was not created: $BkZipFilePath"
+        if (-not (Test-Path -LiteralPath $BackupZipFilePath)) {
+            throw "Backup ZIP file was not created: $BackupZipFilePath"
         }
 
-        Write-Log "INFO" "Final ZIP file backed up successfully: $BkZipFilePath"
+        Write-Log "INFO" "Final ZIP file backed up successfully: $BackupZipFilePath"
     }
     catch {
         Write-Log "ERROR" "Failed to back up final ZIP file. Error: $($_.Exception.Message)"
@@ -600,7 +606,7 @@ if (-not [string]::IsNullOrWhiteSpace($BkRoot)) {
     }
 }
 else {
-    Write-Log "INFO" "Backup root is empty. Skipping ZIP backup."
+    Write-Log "INFO" "Backup path is empty. Skipping ZIP backup."
 }
 
 # ============================================================
@@ -608,8 +614,8 @@ else {
 # ============================================================
 
 try {
-    Remove-Item -LiteralPath $WorkFolder -Recurse -Force
-    Write-Log "INFO" "Temporary working folder removed: $WorkFolder"
+    Remove-Item -LiteralPath $WorkingSessionPath -Recurse -Force
+    Write-Log "INFO" "Temporary working folder removed: $WorkingSessionPath"
 }
 catch {
     Write-Log "ERROR" "Failed to remove temporary working folder after ZIP creation. Error: $($_.Exception.Message)"
@@ -618,15 +624,15 @@ catch {
 }
 
 # ============================================================
-# Clear Config Date Range
+# Reset Config Date Range
 # ============================================================
 
 try {
-    Clear-ConfigDateRange -Path $ConfigPath
-    Write-Log "INFO" "Config file date range cleared successfully."
+    Reset-ConfigDateRange -Path $ConfigPath
+    Write-Log "INFO" "Config file date range reset successfully."
 }
 catch {
-    Write-Log "ERROR" "Failed to clear StartDate and EndDate in config file. Error: $($_.Exception.Message)"
+    Write-Log "ERROR" "Failed to reset ExtractionStartDate and ExtractionEndDate in config file. Error: $($_.Exception.Message)"
     throw
 }
 
