@@ -35,6 +35,9 @@ $ExtractionEndDate   = ""
     If LogPath is empty, the script writes execution logs to:
         ProcessingWorkPath\log
 
+    Script execution logs use one file per day:
+        LogPath\yyyyMMdd.log
+
     If BackupPath is empty, the script skips backing up the final ZIP file.
 #>
 

@@ -33,6 +33,9 @@
     Temporary working files are created under ProcessingWorkPath and removed after
     the final ZIP is created.
 
+    Script execution logs are written to LogPath using one file per day:
+        yyyyMMdd.log
+
     If BackupPath is configured in config.ps1, the final ZIP file is copied there
     after successful creation.
 
@@ -48,7 +51,7 @@
     Get-DcsEnqLogs.ps1
 
 .VERSION
-    1.1.2
+    1.1.3
 
 .AUTHOR
     ITU2
@@ -60,6 +63,9 @@
     2026-06-29
 
 .CHANGELOG
+    1.1.3 - 2026-06-30
+        - Script execution logs now use one file per day: yyyyMMdd.log.
+
     1.1.2 - 2026-06-29
         - Updated help text to document DCS_ACCESS source logs and ENQ ZIP output name.
 
@@ -163,6 +169,7 @@ if (-not (Get-Variable -Name BackupPath -Scope Script -ErrorAction SilentlyConti
 # ============================================================
 
 $RunTimestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$ScriptLogDate = Get-Date -Format "yyyyMMdd"
 
 if ([string]::IsNullOrWhiteSpace($TargetHostName)) {
     $ResolvedHostName = $env:COMPUTERNAME
@@ -199,7 +206,7 @@ catch {
     throw "Failed to create destination, work, or log folder. Error: $($_.Exception.Message)"
 }
 
-$ScriptLogFilePath = Join-Path $LogPath ("Get-DcsEnqLogs_{0}_{1}.log" -f $SafeHostName, $RunTimestamp)
+$ScriptLogFilePath = Join-Path $LogPath ("{0}.log" -f $ScriptLogDate)
 
 function Write-Log {
     param(
@@ -303,6 +310,7 @@ Write-Log "INFO" "Source archive log path: $SourceArchiveLogPath"
 Write-Log "INFO" "Destination ZIP path: $DestinationZipPath"
 Write-Log "INFO" "Processing work path: $ProcessingWorkPath"
 Write-Log "INFO" "Log path: $LogPath"
+Write-Log "INFO" "Script log file: $ScriptLogFilePath"
 Write-Log "INFO" "Backup path: $BackupPath"
 Write-Log "INFO" "Configured extraction start date: $ExtractionStartDate"
 Write-Log "INFO" "Configured extraction end date: $ExtractionEndDate"
