@@ -51,7 +51,7 @@
     Get-DcsEnqLogs.ps1
 
 .VERSION
-    1.1.3
+    1.1.0
 
 .AUTHOR
     ITU2
@@ -60,28 +60,15 @@
     2026-06-12
 
 .LAST UPDATED
-    2026-06-29
+    2026-06-30
 
 .CHANGELOG
-    1.1.3 - 2026-06-30
-        - Script execution logs now use one file per day: yyyyMMdd.log.
-
-    1.1.2 - 2026-06-29
-        - Updated help text to document DCS_ACCESS source logs and ENQ ZIP output name.
-
-    1.1.1 - 2026-06-29
-        - Clean-LogFile now removes lines where the username column contains uat.
-
-    1.1.0 - 2026-06-29
-        - Renamed config variables to follow consistent naming conventions.
-        - Renamed Clear-ConfigDateRange to Reset-ConfigDateRange.
-
-    1.0.2 - 2026-06-29
-        - Added WorkRoot config for temporary working files.
-        - OutputRoot is now used only for the final ZIP destination.
-
-    1.0.1 - 2026-06-29
-        - Added BkRoot config support to back up the final ZIP file.
+    1.1.0 - 2026-06-30
+        - Restructured config.ps1 with separate paths for source, destination, processing, backup, and logs.
+        - Separated temporary working files from the final ZIP output location.
+        - Added backup support for the final ZIP file.
+        - Clean-LogFile now removes lines where the username contains uat.
+        - Script execution logs now use one file per day.
 
     1.0.0 - 2026-06-12
         - Initial release.
