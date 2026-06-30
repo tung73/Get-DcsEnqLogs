@@ -3,17 +3,20 @@
     Collects DCS ENQ logs for a configured date range and outputs one ZIP file.
 
 .DESCRIPTION
-    This script collects DCS_ENQ_yyyyMMdd.log files based on ExtractionStartDate and
-    ExtractionEndDate configured in config.ps1.
+    This script collects DCS ACCESS logs for the date range defined by
+    ExtractionStartDate and ExtractionEndDate in config.ps1.
+
+    Source log files are named:
+        DCS_ACCESS_yyyyMMdd.log
 
     Current month and previous month logs are read from:
-        SourceOnlineLogPath\yyyyMMdd\DCS_ENQ_yyyyMMdd.log
+        SourceOnlineLogPath\yyyyMMdd\DCS_ACCESS_yyyyMMdd.log
 
     Older logs are read from archived monthly ZIP files matching:
         SourceArchiveLogPath\Log*OnlineyyyyMM.zip
 
     Inside each archive ZIP, the script looks for:
-        yyyyMMdd\DCS_ENQ_yyyyMMdd.log
+        yyyyMMdd\DCS_ACCESS_yyyyMMdd.log
 
     Each collected log file is cleaned by keeping only lines that start with
     the timestamp format:
@@ -23,7 +26,8 @@
     The username is the fourth bracket-enclosed field after the timestamp, for example:
         2026-06-04 15:39:56,061 [9] [10.12.187.33] [token] [cpuat37] ...
 
-    The script outputs one ZIP file to DestinationZipPath:
+    Collected log files keep the DCS_ACCESS_yyyyMMdd.log name inside the package.
+    Only the final ZIP file uses the ENQ name:
         DCS_ENQ_StartDate_to_EndDate_HOSTNAME_TIMESTAMP.zip
 
     Temporary working files are created under ProcessingWorkPath and removed after
@@ -44,7 +48,7 @@
     Get-DcsEnqLogs.ps1
 
 .VERSION
-    1.1.1
+    1.1.2
 
 .AUTHOR
     ITU2
@@ -56,6 +60,9 @@
     2026-06-29
 
 .CHANGELOG
+    1.1.2 - 2026-06-29
+        - Updated help text to document DCS_ACCESS source logs and ENQ ZIP output name.
+
     1.1.1 - 2026-06-29
         - Clean-LogFile now removes lines where the username column contains uat.
 
