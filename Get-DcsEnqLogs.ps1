@@ -3,8 +3,8 @@
     Collects DCS ENQ logs for a configured date range and outputs one ZIP file.
 
 .DESCRIPTION
-    This script collects DCS ACCESS logs and outputs them as DCS ENQ logs for the
-    date range defined by ExtractionStartDate and ExtractionEndDate in config.ps1.
+    This script collects DCS ACCESS logs for the date range defined by
+    ExtractionStartDate and ExtractionEndDate in config.ps1.
 
     Source log files are named:
         DCS_ACCESS_yyyyMMdd.log
@@ -26,10 +26,8 @@
     The username is the fourth bracket-enclosed field after the timestamp, for example:
         2026-06-04 15:39:56,061 [9] [10.12.187.33] [token] [cpuat37] ...
 
-    After cleaning, each file is renamed from DCS_ACCESS_yyyyMMdd.log to
-    DCS_ENQ_yyyyMMdd.log before packaging.
-
-    The script outputs one ZIP file to DestinationZipPath:
+    Collected log files keep the DCS_ACCESS_yyyyMMdd.log name inside the package.
+    Only the final ZIP file uses the ENQ name:
         DCS_ENQ_StartDate_to_EndDate_HOSTNAME_TIMESTAMP.zip
 
     Temporary working files are created under ProcessingWorkPath and removed after
@@ -63,8 +61,7 @@
 
 .CHANGELOG
     1.1.2 - 2026-06-29
-        - Updated help text to document DCS_ACCESS source logs and DCS_ENQ output names.
-        - Renamed collected log files from DCS_ACCESS to DCS_ENQ after cleaning.
+        - Updated help text to document DCS_ACCESS source logs and ENQ ZIP output name.
 
     1.1.1 - 2026-06-29
         - Clean-LogFile now removes lines where the username column contains uat.
@@ -412,20 +409,19 @@ while ($CurrentDate -le $ParsedEndDate) {
     $MonthText = $CurrentDate.ToString("yyyyMM")
     $DateMonthStart = Get-MonthStart -Date $CurrentDate
 
-    $SourceLogFileName = "DCS_ACCESS_{0}.log" -f $DateText
-    $OutputLogFileName = "DCS_ENQ_{0}.log" -f $DateText
+    $LogFileName = "DCS_ACCESS_{0}.log" -f $DateText
 
     Write-Log "INFO" "Processing date: $($CurrentDate.ToString('yyyy-MM-dd'))"
 
     $DestinationFolder = Join-Path $WorkingSessionPath (Join-Path $MonthText $DateText)
-    $DestinationFile = Join-Path $DestinationFolder $OutputLogFileName
+    $DestinationFile = Join-Path $DestinationFolder $LogFileName
 
     $FoundForDate = $false
 
     if ($DateMonthStart -ge $PreviousMonthStart) {
         # Online source
         $OnlineDateFolder = Join-Path $SourceOnlineLogPath $DateText
-        $OnlineFile = Join-Path $OnlineDateFolder $SourceLogFileName
+        $OnlineFile = Join-Path $OnlineDateFolder $LogFileName
 
         Write-Log "INFO" "Selected source: online"
         Write-Log "INFO" "Looking for online log: $OnlineFile"
@@ -483,8 +479,8 @@ while ($CurrentDate -le $ParsedEndDate) {
             try {
                 $zip = [System.IO.Compression.ZipFile]::OpenRead($ArchiveFile.FullName)
 
-                $ExpectedEntryForward = "{0}/{1}" -f $DateText, $SourceLogFileName
-                $ExpectedEntryBackslash = "{0}\{1}" -f $DateText, $SourceLogFileName
+                $ExpectedEntryForward = "{0}/{1}" -f $DateText, $LogFileName
+                $ExpectedEntryBackslash = "{0}\{1}" -f $DateText, $LogFileName
 
                 $entry = $zip.Entries | Where-Object {
                     $_.FullName -eq $ExpectedEntryForward -or
